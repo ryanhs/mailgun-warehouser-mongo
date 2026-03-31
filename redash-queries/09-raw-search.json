@@ -1,0 +1,53 @@
+{
+    "collection": "events",
+    "aggregate": [
+        {
+            "$match": {
+                "@timestamp": {
+                    "$gte": "ISODate(\"{{ dateRange.start }}T00:00:00Z\")",
+                    "$lte": "ISODate(\"{{ dateRange.end }}T23:59:59Z\")"
+                }
+            }
+        },
+        {
+            "$match": {
+                "$expr": {
+                    "$anyElementTrue": {
+                        "$map": {
+                            "input": { "$split": ["{{search}}", ","] },
+                            "as": "term",
+                            "in": {
+                                "$or": [
+                                    { "$gte": [{ "$indexOfCP": [{ "$toLower": { "$ifNull": ["$recipient", ""] } }, { "$toLower": { "$trim": { "input": "$$term" } } }] }, 0] },
+                                    { "$gte": [{ "$indexOfCP": [{ "$toLower": { "$ifNull": ["$message.headers.subject", ""] } }, { "$toLower": { "$trim": { "input": "$$term" } } }] }, 0] },
+                                    { "$gte": [{ "$indexOfCP": [{ "$toLower": { "$ifNull": ["$message.headers.from", ""] } }, { "$toLower": { "$trim": { "input": "$$term" } } }] }, 0] },
+                                    { "$gte": [{ "$indexOfCP": [{ "$toLower": { "$ifNull": ["$envelope.targets", ""] } }, { "$toLower": { "$trim": { "input": "$$term" } } }] }, 0] }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "timestamp": "$@timestamp",
+                "event": 1,
+                "log_level": "$log-level",
+                "recipient": 1,
+                "recipient_domain": "$recipient-domain",
+                "from": "$message.headers.from",
+                "subject": "$message.headers.subject",
+                "template": "$template.name",
+                "reason": 1
+            }
+        },
+        {
+            "$sort": [{ "name": "timestamp", "direction": -1 }]
+        },
+        {
+            "$limit": 200
+        }
+    ]
+}

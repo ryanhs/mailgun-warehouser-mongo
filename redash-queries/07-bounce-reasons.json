@@ -13,19 +13,20 @@
         {
             "$group": {
                 "_id": {
-                    "severity": "$severity",
+                    "log_level": "$log-level",
                     "reason": { "$ifNull": ["$reason", "unknown"] }
                 },
                 "count": { "$sum": 1 },
-                "sample_recipients": { "$push": "$recipient" }
+                "sample_recipients": { "$addToSet": "$recipient" }
             }
         },
         {
             "$project": {
                 "_id": 0,
-                "severity": "$_id.severity",
+                "log_level": "$_id.log_level",
                 "reason": "$_id.reason",
                 "count": 1,
+                "unique_recipients": { "$size": "$sample_recipients" },
                 "sample_recipients": { "$slice": ["$sample_recipients", 5] }
             }
         },
