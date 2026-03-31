@@ -1,0 +1,20 @@
+{
+    "collection": "syncs",
+    "aggregate": [
+        {
+            "$sort": [{ "name": "date", "direction": -1 }]
+        },
+        {
+            "$limit": 30
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "date": 1,
+                "domain": 1,
+                "fetchedAt": 1,
+                "eventCount": 1
+            }
+        }
+    ]
+}

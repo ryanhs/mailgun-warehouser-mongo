@@ -1,0 +1,33 @@
+{
+    "collection": "events",
+    "aggregate": [
+        {
+            "$match": {
+                "@timestamp": {
+                    "$gte": "ISODate(\"{{ dateRange.start }}T00:00:00Z\")",
+                    "$lte": "ISODate(\"{{ dateRange.end }}T23:59:59Z\")"
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": {
+                    "date": { "$dateToString": { "format": "%Y-%m-%d", "date": "$@timestamp" } },
+                    "event": "$event"
+                },
+                "count": { "$sum": 1 }
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "date": "$_id.date",
+                "event": "$_id.event",
+                "count": 1
+            }
+        },
+        {
+            "$sort": [{ "name": "date", "direction": 1 }, { "name": "event", "direction": 1 }]
+        }
+    ]
+}

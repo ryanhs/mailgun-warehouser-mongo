@@ -1,0 +1,48 @@
+{
+    "collection": "events",
+    "aggregate": [
+        {
+            "$match": {
+                "@timestamp": {
+                    "$gte": "ISODate(\"{{ dateRange.start }}T00:00:00Z\")",
+                    "$lte": "ISODate(\"{{ dateRange.end }}T23:59:59Z\")"
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": "$recipient",
+                "total": { "$sum": 1 },
+                "delivered": {
+                    "$sum": { "$cond": [{ "$eq": ["$event", "delivered"] }, 1, 0] }
+                },
+                "opened": {
+                    "$sum": { "$cond": [{ "$eq": ["$event", "opened"] }, 1, 0] }
+                },
+                "clicked": {
+                    "$sum": { "$cond": [{ "$eq": ["$event", "clicked"] }, 1, 0] }
+                },
+                "failed": {
+                    "$sum": { "$cond": [{ "$in": ["$event", ["failed", "rejected"]] }, 1, 0] }
+                }
+            }
+        },
+        {
+            "$sort": [{ "name": "total", "direction": -1 }]
+        },
+        {
+            "$limit": 50
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "recipient": "$_id",
+                "total": 1,
+                "delivered": 1,
+                "opened": 1,
+                "clicked": 1,
+                "failed": 1
+            }
+        }
+    ]
+}

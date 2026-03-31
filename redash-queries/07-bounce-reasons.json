@@ -1,0 +1,36 @@
+{
+    "collection": "events",
+    "aggregate": [
+        {
+            "$match": {
+                "event": { "$in": ["failed", "rejected"] },
+                "@timestamp": {
+                    "$gte": "ISODate(\"{{ dateRange.start }}T00:00:00Z\")",
+                    "$lte": "ISODate(\"{{ dateRange.end }}T23:59:59Z\")"
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": {
+                    "severity": "$severity",
+                    "reason": { "$ifNull": ["$reason", "unknown"] }
+                },
+                "count": { "$sum": 1 },
+                "sample_recipients": { "$push": "$recipient" }
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "severity": "$_id.severity",
+                "reason": "$_id.reason",
+                "count": 1,
+                "sample_recipients": { "$slice": ["$sample_recipients", 5] }
+            }
+        },
+        {
+            "$sort": [{ "name": "count", "direction": -1 }]
+        }
+    ]
+}

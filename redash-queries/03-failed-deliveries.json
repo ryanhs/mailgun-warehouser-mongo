@@ -1,0 +1,35 @@
+{
+    "collection": "events",
+    "aggregate": [
+        {
+            "$match": {
+                "event": { "$in": ["failed", "rejected"] },
+                "@timestamp": {
+                    "$gte": "ISODate(\"{{ dateRange.start }}T00:00:00Z\")",
+                    "$lte": "ISODate(\"{{ dateRange.end }}T23:59:59Z\")"
+                }
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "timestamp": "$@timestamp",
+                "event": 1,
+                "log_level": "$log-level",
+                "recipient": 1,
+                "reason": 1,
+                "description": "$delivery-status.description",
+                "code": "$delivery-status.code",
+                "subject": "$message.headers.subject",
+                "from": "$message.headers.from",
+                "recipient_domain": "$recipient-domain"
+            }
+        },
+        {
+            "$sort": [{ "name": "timestamp", "direction": -1 }]
+        },
+        {
+            "$limit": 200
+        }
+    ]
+}

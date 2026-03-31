@@ -37,13 +37,19 @@ export async function ensureIndexes(): Promise<void> {
   console.log("  Indexes ensured on events collection");
 }
 
-export async function insertEvents(events: object[]): Promise<number> {
+export async function insertEvents(events: Record<string, any>[]): Promise<number> {
   if (events.length === 0) return 0;
 
   const collection = getEventsCollection();
 
+  // Convert @timestamp from ISO string to native Date for proper indexing
+  const docs = events.map((e) => ({
+    ...e,
+    "@timestamp": e["@timestamp"] ? new Date(e["@timestamp"]) : e["@timestamp"],
+  }));
+
   try {
-    const result = await collection.insertMany(events, { ordered: false });
+    const result = await collection.insertMany(docs, { ordered: false });
     return result.insertedCount;
   } catch (error: any) {
     // With ordered: false, duplicates throw a BulkWriteError but
@@ -69,7 +75,7 @@ export async function upsertSync(
       $set: {
         date,
         domain,
-        fetchedAt: DateTime.utc().toISO(),
+        fetchedAt: new Date(),
         eventCount,
       },
     },

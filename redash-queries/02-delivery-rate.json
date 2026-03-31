@@ -1,0 +1,46 @@
+{
+    "collection": "events",
+    "aggregate": [
+        {
+            "$match": {
+                "@timestamp": {
+                    "$gte": "ISODate(\"{{ dateRange.start }}T00:00:00Z\")",
+                    "$lte": "ISODate(\"{{ dateRange.end }}T23:59:59Z\")"
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": "$event",
+                "count": { "$sum": 1 }
+            }
+        },
+        {
+            "$group": {
+                "_id": null,
+                "events": { "$push": { "event": "$_id", "count": "$count" } },
+                "total": { "$sum": "$count" }
+            }
+        },
+        {
+            "$unwind": "$events"
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "event": "$events.event",
+                "count": "$events.count",
+                "total": 1,
+                "pct": {
+                    "$round": [
+                        { "$multiply": [{ "$divide": ["$events.count", "$total"] }, 100] },
+                        2
+                    ]
+                }
+            }
+        },
+        {
+            "$sort": [{ "name": "count", "direction": -1 }]
+        }
+    ]
+}
