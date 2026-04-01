@@ -1,7 +1,7 @@
 import { DateTime } from "luxon";
 import { Config } from "./config";
 import { fetchEvents } from "./mailgun-client";
-import { connectDb, ensureIndexes, insertEvents, upsertSync, closeDb } from "./mongodb";
+import { connectDb, ensureIndexes, upsertEvents, upsertSync, closeDb } from "./mongodb";
 
 export async function syncDate(config: Config, date: DateTime): Promise<void> {
   const dateStr = date.toFormat("yyyy-MM-dd");
@@ -14,20 +14,31 @@ export async function syncDate(config: Config, date: DateTime): Promise<void> {
   await connectDb(config.mongodbUri);
   await ensureIndexes();
 
-  let totalInserted = 0;
+  let totalProcessed = 0;
+  let totalUpserted = 0;
+  let totalMatched = 0;
+  let totalModified = 0;
+  let totalSkippedNoId = 0;
 
   const { totalEvents, pagesCount } = await fetchEvents(
     config,
     begin,
     end,
     async (items, _pageNum, _totalSoFar) => {
-      const inserted = await insertEvents(items);
-      totalInserted += inserted;
+      const result = await upsertEvents(items);
+      totalProcessed += result.processedCount;
+      totalUpserted += result.upsertedCount;
+      totalMatched += result.matchedCount;
+      totalModified += result.modifiedCount;
+      totalSkippedNoId += result.skippedNoId;
     }
   );
 
   console.log(`  Fetched ${totalEvents} events across ${pagesCount} page(s)`);
-  console.log(`  Inserted ${totalInserted} new events (${totalEvents - totalInserted} duplicates skipped)`);
+  console.log(`  Upserted ${totalProcessed} events (new: ${totalUpserted}, existing matched: ${totalMatched}, existing modified: ${totalModified})`);
+  if (totalSkippedNoId > 0) {
+    console.log(`  Skipped ${totalSkippedNoId} event(s) without id`);
+  }
 
   await upsertSync(dateStr, config.mailgunDomain, totalEvents);
 

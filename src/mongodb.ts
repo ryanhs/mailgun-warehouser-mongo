@@ -37,29 +37,66 @@ export async function ensureIndexes(): Promise<void> {
   console.log("  Indexes ensured on events collection");
 }
 
-export async function insertEvents(events: Record<string, any>[]): Promise<number> {
-  if (events.length === 0) return 0;
+export interface UpsertEventsResult {
+  processedCount: number;
+  upsertedCount: number;
+  matchedCount: number;
+  modifiedCount: number;
+  skippedNoId: number;
+}
+
+export async function upsertEvents(events: Record<string, any>[]): Promise<UpsertEventsResult> {
+  if (events.length === 0) {
+    return {
+      processedCount: 0,
+      upsertedCount: 0,
+      matchedCount: 0,
+      modifiedCount: 0,
+      skippedNoId: 0,
+    };
+  }
 
   const collection = getEventsCollection();
 
   // Convert @timestamp from ISO string to native Date for proper indexing
-  const docs = events.map((e) => ({
+  const docs: Record<string, any>[] = events.map((e) => ({
     ...e,
     "@timestamp": e["@timestamp"] ? new Date(e["@timestamp"]) : e["@timestamp"],
   }));
 
-  try {
-    const result = await collection.insertMany(docs, { ordered: false });
-    return result.insertedCount;
-  } catch (error: any) {
-    // With ordered: false, duplicates throw a BulkWriteError but
-    // non-duplicate docs are still inserted
-    if (error?.code === 11000 || error?.name === "MongoBulkWriteError") {
-      const inserted = error.result?.insertedCount ?? 0;
-      return inserted;
-    }
-    throw error;
+  const validDocs = docs.filter(
+    (doc): doc is Record<string, any> & { id: string } =>
+      typeof doc.id === "string" && doc.id.length > 0
+  );
+  const skippedNoId = docs.length - validDocs.length;
+
+  if (validDocs.length === 0) {
+    return {
+      processedCount: 0,
+      upsertedCount: 0,
+      matchedCount: 0,
+      modifiedCount: 0,
+      skippedNoId,
+    };
   }
+
+  const operations = validDocs.map((doc) => ({
+    updateOne: {
+      filter: { id: doc.id },
+      update: { $set: doc },
+      upsert: true,
+    },
+  }));
+
+  const result = await collection.bulkWrite(operations, { ordered: false });
+
+  return {
+    processedCount: validDocs.length,
+    upsertedCount: result.upsertedCount,
+    matchedCount: result.matchedCount,
+    modifiedCount: result.modifiedCount,
+    skippedNoId,
+  };
 }
 
 export async function upsertSync(

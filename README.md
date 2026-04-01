@@ -31,7 +31,7 @@ yarn sync
 yarn sync --date 2026-03-15
 ```
 
-Each run fetches one day of events, inserts into MongoDB, and exits. Re-running for the same date is safe -- duplicates are skipped.
+Each run fetches one day of events, upserts into MongoDB by event `id`, and exits. Re-running for the same date is safe -- existing rows are updated.
 
 ## Docker
 
@@ -110,8 +110,8 @@ mongosh "$MONGODB_URI" --eval 'db.syncs.find().sort({date: -1}).limit(10).pretty
 
 - Calls Mailgun's Logs API (`POST /v1/analytics/logs`) directly via `fetch()`
 - Paginates through results (100 events per page) with token-based pagination
-- Inserts each page into MongoDB immediately via `insertMany` (no data loss if interrupted)
-- Duplicates silently skipped via unique index on event `id`
+- Upserts each page into MongoDB immediately via bulk `updateOne(..., { upsert: true })` on event `id`
+- Re-syncing updates existing rows and inserts any missing rows
 - Retries failed API requests with exponential backoff (max 3 retries)
 
 ## Project Structure
